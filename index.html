@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Solari</title>
+  <meta name="description" content="A Solari split-flap flip clock." />
+  <meta name="theme-color" content="#0a0a0a" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg:        #0a0a0a;
+      --cream:     #f4ecd6;   /* the flap characters                 */
+      --muted:     #6b6d66;   /* date row                            */
+      --muted-2:   #7c7f76;   /* location row                        */
+
+      /* split-flap tile surfaces */
+      --tile-top:    linear-gradient(180deg, #272727 0%, #1e1e1e 100%);
+      --tile-bottom: linear-gradient(180deg, #1a1a1a 0%, #131313 100%);
+      --tile-radius: 0.12em;
+
+      --mono: "Roboto Mono", ui-monospace, "SFMono-Regular", "SF Mono",
+              "JetBrains Mono", "DejaVu Sans Mono", "Courier New", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      background:
+        radial-gradient(120% 90% at 50% 46%, #131313 0%, #0b0b0b 55%, #070707 100%);
+      color: var(--cream);
+      font-family: var(--mono);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    .board {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: clamp(0.9rem, 2.4vh, 1.9rem);
+      padding: 4vmin;
+    }
+
+    /* ---------- small label rows (date / location / greeting) ---------- */
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: nowrap;
+    }
+    .row.date    { gap: 0.28em; font-size: clamp(0.72rem, 2.1vw, 1.15rem); letter-spacing: 0.04em; }
+    .row.place   { gap: 0.30em; font-size: clamp(0.72rem, 2.1vw, 1.15rem); }
+    .row.welcome {
+      position: fixed;
+      top: clamp(1.4rem, 5.5vh, 3.4rem);
+      left: 0;
+      right: 0;
+      gap: 0.14em;
+      font-size: clamp(0.95rem, 2.7vw, 1.5rem);
+      font-weight: 700;
+      --cell-w: 0.92em;
+      --cell-h: 1.22em;
+      --flip: 120ms;
+    }
+    .row.welcome .cell { filter: drop-shadow(0 3px 7px rgba(0,0,0,0.5)); }
+
+    .mini {
+      position: relative;
+      width: 1.05em;
+      height: 1.34em;
+      border-radius: 0.16em;
+      background: var(--tile-top);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.015);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 500;
+      line-height: 1;
+    }
+    /* the mid seam that reads as a split-flap gap */
+    .mini::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0; top: 50%;
+      height: 2px;
+      transform: translateY(-1px);
+      background: rgba(0,0,0,0.85);
+      box-shadow: 0 1px 0 rgba(255,255,255,0.02);
+    }
+    .mini > span { position: relative; z-index: 1; }
+
+    .row.date    .mini { color: var(--muted);   }
+    .row.place   .mini { color: var(--muted-2);  }
+    .row.welcome .mini { color: var(--cream);    font-weight: 700; }
+
+    .mini-gap { display: inline-block; width: 0.55em; }
+
+    /* ---------------------------- big clock ---------------------------- */
+    .clock {
+      --cell-w: 0.80em;
+      --cell-h: 1.16em;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.12em;
+      font-size: clamp(2.6rem, 12.5vw, 8.6rem);
+      font-weight: 700;
+      line-height: 1;
+      perspective: 700px;
+    }
+
+    .cell {
+      position: relative;
+      width: var(--cell-w);
+      height: var(--cell-h);
+      border-radius: var(--tile-radius);
+      filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55));
+    }
+
+    /* a half is a clipped window; its span is the full-height glyph, pinned
+       to the top (top half) or bottom (bottom half) so each shows one slice */
+    .static, .leaf {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: calc(50% - 1px);
+      overflow: hidden;
+      backface-visibility: hidden;
+    }
+    .static.top,  .leaf.top    { top: 0;    border-radius: var(--tile-radius) var(--tile-radius) 0 0; background: var(--tile-top);    }
+    .static.bottom, .leaf.bottom { bottom: 0; border-radius: 0 0 var(--tile-radius) var(--tile-radius); background: var(--tile-bottom); }
+
+    .static.top    { box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
+    .static.bottom { box-shadow: inset 0 -1px 0 rgba(0,0,0,0.6); }
+
+    .cell span {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: var(--cell-h);
+      line-height: var(--cell-h);
+      text-align: center;
+      color: var(--cream);
+    }
+    .top    span { top: 0; }
+    .bottom span { bottom: 0; }
+
+    /* leaves fold around the seam */
+    .leaf.top    { transform-origin: bottom; transform: rotateX(0deg);  z-index: 3; }
+    .leaf.bottom { transform-origin: top;    transform: rotateX(90deg); z-index: 4; }
+    .leaf.top    { box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
+    .leaf.bottom { box-shadow: inset 0 -1px 0 rgba(0,0,0,0.6); }
+
+    .cell.flipping .leaf.top    { animation: flip-top    var(--flip, 320ms) ease-in forwards;  }
+    .cell.flipping .leaf.bottom { animation: flip-bottom var(--flip, 320ms) ease-out forwards; }
+
+    @keyframes flip-top {
+      0%        { transform: rotateX(0deg);   }
+      50%, 100% { transform: rotateX(-90deg); }
+    }
+    @keyframes flip-bottom {
+      0%, 50% { transform: rotateX(90deg); }
+      100%    { transform: rotateX(0deg);  }
+    }
+
+    /* colon separators */
+    .colon {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.26em;
+      height: var(--cell-h);
+      padding: 0 0.02em;
+    }
+    .colon .dot {
+      width: 0.13em;
+      height: 0.13em;
+      border-radius: 50%;
+      background: var(--cream);
+    }
+    .colon.sec { animation: blink 2s steps(1, end) infinite; }
+    @keyframes blink {
+      0%, 49%  { opacity: 1;    }
+      50%,100% { opacity: 0.22; }
+    }
+
+    /* download wallpaper button — accent (cream) fill, matching the clock */
+    .download {
+      margin-top: min(160px, 20vh);            /* sit well below the location */
+      display: inline-block;
+      text-decoration: none;
+      font-family: var(--mono);
+      font-size: clamp(0.6rem, 1.5vw, 0.78rem);
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #16140d;                          /* dark ink on the cream fill */
+      background: var(--cream);
+      border: 1px solid var(--cream);
+      border-radius: 0.45em;
+      padding: 0.82em 1.2em 0.82em 1.42em;     /* extra left to offset letter-spacing */
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+      transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+    }
+    .download:hover  { background: #fdf6e3; box-shadow: 0 9px 24px rgba(0, 0, 0, 0.5); }
+    .download:active { transform: translateY(1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); }
+    .download:focus-visible { outline: 2px solid rgba(244, 236, 214, 0.55); outline-offset: 3px; }
+    .download[disabled] { opacity: 0.6; cursor: default; }
+
+    /* sound toggle (bottom-right) */
+    .sound {
+      position: fixed;
+      bottom: clamp(1rem, 3vh, 1.9rem);
+      left:   clamp(1rem, 3vw, 1.9rem);
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      color: var(--muted-2);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(244, 236, 214, 0.12);
+      border-radius: 50%;
+      cursor: pointer;
+      transition: color .2s ease, border-color .2s ease, background .2s ease;
+    }
+    .sound:hover { color: var(--cream); border-color: rgba(244, 236, 214, 0.35); background: rgba(244, 236, 214, 0.05); }
+    .sound:focus-visible { outline: none; border-color: rgba(244, 236, 214, 0.5); color: var(--cream); }
+    .sound svg { width: 21px; height: 21px; display: block; }
+    .sound .spk   { fill: currentColor; }
+    .sound .wave  { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+    .sound .slash { stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; display: none; }
+    .sound.muted .wave  { display: none; }
+    .sound.muted .slash { display: block; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .cell.flipping .leaf.top,
+      .cell.flipping .leaf.bottom { animation: none; }
+      .leaf.top    { transform: rotateX(-90deg); }
+      .leaf.bottom { transform: rotateX(0deg);   }
+      .colon.sec   { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="row welcome" id="welcome" aria-hidden="true"></div>
+
+  <main class="board" aria-label="Solari clock">
+    <div class="row date"  id="date"  aria-hidden="true"></div>
+    <div class="clock"     id="clock" role="timer" aria-live="off"></div>
+    <div class="row place" id="place" aria-hidden="true"></div>
+    <a class="download" id="download" href="#" target="_blank" rel="noopener noreferrer">Download Solari</a>
+  </main>
+
+  <button class="sound muted" id="sound" type="button" aria-label="Toggle flip sound" aria-pressed="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path class="spk"  d="M4 9v6h4l5 4V5L8 9H4z"/>
+      <path class="wave" d="M16.4 9.2a4 4 0 0 1 0 5.6"/>
+      <path class="wave" d="M19 6.7a7.5 7.5 0 0 1 0 10.6"/>
+      <line class="slash" x1="4" y1="3.5" x2="20.5" y2="20.5"/>
+    </svg>
+  </button>
+
+  <script>
+    // ---- configuration -------------------------------------------------
+    const LOCATION = "MADIPAKKAM";
+    const GREETING = "Welcome to Solari!";
+    const HOUR_24  = true;   // 24-hour clock
+
+    // Download button target — the notarised app's GitHub download page.
+    // TODO: replace this placeholder with the real URL once the app is hosted.
+    const DOWNLOAD_URL = "https://github.com/";
+
+    const DAYS   = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+    const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+    const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
+    const pad = n => String(n).padStart(2, "0");
+
+    // ---- split-flap cell ----------------------------------------------
+    function makeCell(initial) {
+      const cell = el("div", "cell");
+      const halves = {};
+      for (const [kind, part] of [["static","top"],["static","bottom"],["leaf","top"],["leaf","bottom"]]) {
+        const h = el("div", `${kind} ${part}`);
+        const s = el("span");
+        s.textContent = initial;
+        h.appendChild(s);
+        cell.appendChild(h);
+        halves[`${kind}-${part}`] = s;
+      }
+      cell._value = initial;
+
+      cell.setChar = (next) => {
+        if (next === cell._value) return;
+        const prev = cell._value;
+        cell._value = next;
+        halves["static-top"].textContent    = next;   // reveal NEW on top as leaf folds away
+        halves["leaf-top"].textContent       = prev;   // folding leaf shows OLD top
+        halves["leaf-bottom"].textContent    = next;   // rising leaf shows NEW bottom
+        // static-bottom keeps OLD until the flip completes
+        cell.classList.remove("flipping");
+        void cell.offsetWidth;                          // restart the animation
+        cell.classList.add("flipping");
+        clack();                                        // mechanical flap sound (if enabled)
+      };
+
+      cell.addEventListener("animationend", (e) => {
+        if (e.animationName !== "flip-bottom") return;
+        halves["static-bottom"].textContent = cell._value;
+        halves["leaf-top"].textContent      = cell._value;  // keep idle leaf in sync
+        cell.classList.remove("flipping");
+      });
+
+      cell.setImmediate = (v) => {              // set value with no flip (used on load)
+        cell._value = v;
+        for (const k in halves) halves[k].textContent = v;
+        cell.classList.remove("flipping");
+      };
+
+      return cell;
+    }
+
+    function makeColon(second) {
+      const c = el("div", "colon" + (second ? " sec" : ""));
+      c.appendChild(el("span", "dot"));
+      c.appendChild(el("span", "dot"));
+      return c;
+    }
+
+    // ---- build the clock ----------------------------------------------
+    const clockEl = document.getElementById("clock");
+    const digits = [];
+    function addDigit() { const c = makeCell("0"); digits.push(c); clockEl.appendChild(c); }
+
+    addDigit(); addDigit();
+    clockEl.appendChild(makeColon(false));
+    addDigit(); addDigit();
+    clockEl.appendChild(makeColon(true));
+    addDigit(); addDigit();
+
+    // ---- small label rows ---------------------------------------------
+    function buildRow(container, text, extraClass) {
+      container.textContent = "";
+      for (const ch of text) {
+        if (ch === " ") { container.appendChild(el("span", "mini-gap")); continue; }
+        const t = el("div", "mini" + (extraClass ? " " + extraClass : ""));
+        const s = el("span");
+        s.textContent = ch;
+        t.appendChild(s);
+        container.appendChild(t);
+      }
+    }
+
+    const dateEl = document.getElementById("date");
+    let lastDate = "";
+    function renderDate(now) {
+      const str = `${DAYS[now.getDay()]} ${pad(now.getDate())} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+      if (str !== lastDate) { buildRow(dateEl, str); lastDate = str; }
+    }
+
+    buildRow(document.getElementById("place"), LOCATION);
+
+    // welcome banner: real split-flap cells that shuffle in on load
+    function buildFlipRow(container, text) {
+      container.textContent = "";
+      const cells = [];
+      for (const ch of text) {
+        if (ch === " ") { container.appendChild(el("span", "mini-gap")); continue; }
+        const cell = makeCell(" ");
+        container.appendChild(cell);
+        cells.push({ cell, ch });
+      }
+      return cells;
+    }
+
+    function revealFlipRow(cells) {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      cells.forEach(({ cell, ch }, i) => {
+        if (reduce) { cell.setChar(ch); return; }
+        const steps = 4 + (i % 3);          // a little per-tile variation
+        let n = 0;
+        setTimeout(() => {                    // cascade left to right
+          const id = setInterval(() => {
+            if (n >= steps) { clearInterval(id); cell.setChar(ch); return; }
+            cell.setChar(ALPHA[(Math.random() * ALPHA.length) | 0]);
+            n++;
+          }, 140);
+        }, i * 60);
+      });
+    }
+
+    revealFlipRow(buildFlipRow(document.getElementById("welcome"), GREETING));
+
+    // ---- tick ----------------------------------------------------------
+    function timeDigits(now) {
+      let h = now.getHours();
+      if (!HOUR_24) { h = h % 12 || 12; }
+      return pad(h) + pad(now.getMinutes()) + pad(now.getSeconds());
+    }
+
+    function tick(instant) {
+      const now = new Date();
+      renderDate(now);
+      const s = timeDigits(now);
+      for (let i = 0; i < 6; i++) {
+        instant ? digits[i].setImmediate(s[i]) : digits[i].setChar(s[i]);
+      }
+    }
+
+    tick(true);   // paint the current time with NO flip on load — only the intro animates
+    // align to the next whole second, then flip on each change
+    setTimeout(() => { tick(); setInterval(tick, 1000); }, 1000 - (Date.now() % 1000));
+
+    // ---- download button → git release page --------------------------
+    // Links to the notarised app's GitHub download page (opens in a new tab).
+    document.getElementById("download").href = DOWNLOAD_URL;
+
+    // ---- flip sound (Web Audio, synthesized split-flap clack) ---------
+    let audioCtx = null, soundOn = false, noiseBuffer = null, lastClackAt = 0;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        audioCtx = new AC();
+        const len = Math.floor(audioCtx.sampleRate * 0.07);
+        noiseBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+        const d = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
+      }
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    }
+
+    // a clack = a short filtered noise "flutter" + a low wooden click
+    function clack() {
+      if (!soundOn || !audioCtx) return;
+      const now = performance.now();
+      if (now - lastClackAt < 26) return;               // merge simultaneous flips
+      lastClackAt = now;
+      const t = audioCtx.currentTime;
+
+      const src = audioCtx.createBufferSource();
+      src.buffer = noiseBuffer;
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = "bandpass"; bp.frequency.value = 2400; bp.Q.value = 0.9;
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.16, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+      src.connect(bp); bp.connect(g); g.connect(audioCtx.destination);
+      src.start(t); src.stop(t + 0.07);
+
+      const osc = audioCtx.createOscillator();
+      osc.type = "triangle"; osc.frequency.setValueAtTime(170, t);
+      const g2 = audioCtx.createGain();
+      g2.gain.setValueAtTime(0.0001, t);
+      g2.gain.exponentialRampToValueAtTime(0.09, t + 0.002);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+      osc.connect(g2); g2.connect(audioCtx.destination);
+      osc.start(t); osc.stop(t + 0.06);
+    }
+
+    const soundBtn = document.getElementById("sound");
+    soundBtn.addEventListener("click", () => {
+      soundOn = !soundOn;                                // this click is the gesture that unlocks audio
+      soundBtn.classList.toggle("muted", !soundOn);
+      soundBtn.setAttribute("aria-pressed", String(soundOn));
+      if (soundOn) { initAudio(); clack(); }             // instant feedback that it's on
+    });
+  </script>
+</body>
+</html>
