@@ -1,0 +1,10 @@
+{
+  // Cloudflare Workers static-assets config — serves this static landing page.
+  // No server-side code: just uploads the files in this directory and serves them.
+  // Docs: https://developers.cloudflare.com/workers/static-assets/
+  "name": "solari",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "./"
+  }
+}
