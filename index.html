@@ -250,6 +250,22 @@
     .sound.muted .wave  { display: none; }
     .sound.muted .slash { display: block; }
 
+    /* privacy link (bottom-right) */
+    .privacy {
+      position: fixed;
+      bottom: clamp(1rem, 3vh, 1.9rem);
+      right:  clamp(1rem, 3vw, 1.9rem);
+      font-family: var(--mono);
+      font-size: clamp(0.56rem, 1.4vw, 0.72rem);
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted-2);
+      text-decoration: none;
+      transition: color .2s ease;
+    }
+    .privacy:hover, .privacy:focus-visible { color: var(--cream); outline: none; }
+
     @media (prefers-reduced-motion: reduce) {
       .cell.flipping .leaf.top,
       .cell.flipping .leaf.bottom { animation: none; }
@@ -269,7 +285,7 @@
     <a class="download" id="download" href="#" target="_blank" rel="noopener noreferrer">Download Solari</a>
   </main>
 
-  <button class="sound muted" id="sound" type="button" aria-label="Toggle flip sound" aria-pressed="false">
+  <button class="sound" id="sound" type="button" aria-label="Toggle flip sound" aria-pressed="true">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path class="spk"  d="M4 9v6h4l5 4V5L8 9H4z"/>
       <path class="wave" d="M16.4 9.2a4 4 0 0 1 0 5.6"/>
@@ -277,6 +293,8 @@
       <line class="slash" x1="4" y1="3.5" x2="20.5" y2="20.5"/>
     </svg>
   </button>
+
+  <a class="privacy" id="privacy" href="privacy.html">Privacy</a>
 
   <script>
     // ---- configuration -------------------------------------------------
@@ -435,7 +453,7 @@
     document.getElementById("download").href = DOWNLOAD_URL;
 
     // ---- flip sound (Web Audio, synthesized split-flap clack) ---------
-    let audioCtx = null, soundOn = false, noiseBuffer = null, lastClackAt = 0;
+    let audioCtx = null, soundOn = true, noiseBuffer = null, lastClackAt = 0;
 
     function initAudio() {
       if (!audioCtx) {
@@ -452,7 +470,7 @@
 
     // a clack = a short filtered noise "flutter" + a low wooden click
     function clack() {
-      if (!soundOn || !audioCtx) return;
+      if (!soundOn || !audioCtx || audioCtx.state !== "running") return;
       const now = performance.now();
       if (now - lastClackAt < 26) return;               // merge simultaneous flips
       lastClackAt = now;
@@ -486,6 +504,16 @@
       soundBtn.setAttribute("aria-pressed", String(soundOn));
       if (soundOn) { initAudio(); clack(); }             // instant feedback that it's on
     });
+
+    // Sound is ON by default, but browsers require a user gesture before audio
+    // can play — so unlock the context on the first interaction anywhere.
+    function unlockAudio() {
+      if (soundOn) initAudio();
+      ["pointerdown", "keydown", "touchstart"].forEach((e) => window.removeEventListener(e, unlockAudio));
+    }
+    ["pointerdown", "keydown", "touchstart"].forEach((e) =>
+      window.addEventListener(e, unlockAudio, { passive: true })
+    );
   </script>
 </body>
 </html>
