@@ -7,11 +7,15 @@
   <meta name="description" content="A Solari split-flap flip clock." />
   <meta name="theme-color" content="#0a0a0a" />
 
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-
   <style>
+    /* Self-hosted Roboto Mono (variable, latin subset) — no third-party font requests */
+    @font-face {
+      font-family: "Roboto Mono";
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      src: url("fonts/RobotoMono-latin.woff2") format("woff2");
+    }
     :root {
       --bg:        #0a0a0a;
       --cream:     #f4ecd6;   /* the flap characters                 */
