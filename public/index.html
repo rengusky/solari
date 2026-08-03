@@ -205,13 +205,16 @@
       50%,100% { opacity: 0.22; }
     }
 
-    /* download wallpaper button — accent (cream) fill, matching the clock */
+    /* download button — accent (cream) fill; sits in the bottom bar, level with the sound toggle */
     .download {
-      margin-top: min(160px, 20vh);            /* sit well below the location */
+      position: fixed;
+      bottom: clamp(1rem, 3vh, 1.9rem);        /* same baseline as .sound / .privacy */
+      left: 50%;
+      transform: translateX(-50%);
       display: inline-block;
       text-decoration: none;
       font-family: var(--mono);
-      font-size: clamp(0.6rem, 1.5vw, 0.78rem);
+      font-size: clamp(0.66rem, 1.65vw, 0.86rem); /* +10% */
       font-weight: 600;
       letter-spacing: 0.22em;
       text-transform: uppercase;
@@ -219,13 +222,13 @@
       background: var(--cream);
       border: 1px solid var(--cream);
       border-radius: 0.45em;
-      padding: 0.82em 1.2em 0.82em 1.42em;     /* extra left to offset letter-spacing */
+      padding: 0.82em 1.2em 0.82em 1.42em;     /* em-based → scales 10% with the font */
       cursor: pointer;
       box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
       transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
     }
     .download:hover  { background: #fdf6e3; box-shadow: 0 9px 24px rgba(0, 0, 0, 0.5); }
-    .download:active { transform: translateY(1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); }
+    .download:active { transform: translateX(-50%) translateY(1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45); }
     .download:focus-visible { outline: 2px solid rgba(244, 236, 214, 0.55); outline-offset: 3px; }
     .download[disabled] { opacity: 0.6; cursor: default; }
 
@@ -286,8 +289,9 @@
     <div class="row date"  id="date"  aria-hidden="true"></div>
     <div class="clock"     id="clock" role="timer" aria-live="off"></div>
     <div class="row place" id="place" aria-hidden="true"></div>
-    <a class="download" id="download" href="#" target="_blank" rel="noopener noreferrer">Download Solari</a>
   </main>
+
+  <a class="download" id="download" href="#" target="_blank" rel="noopener noreferrer">Download Solari</a>
 
   <button class="sound" id="sound" type="button" aria-label="Toggle flip sound" aria-pressed="true">
     <svg viewBox="0 0 24 24" aria-hidden="true">
